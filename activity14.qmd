@@ -1,0 +1,239 @@
+---
+title: "Reproducible Data Stories"
+author: "Sushanth Penumala"
+date: "2025-11-13"
+format:
+  pdf:
+    toc: true
+    number-sections: true
+execute:
+  echo: false
+  warning: false
+  message: false
+---
+
+```{r}
+#| label: setup
+#| include: false
+
+library(tidyverse)
+library(googlesheets4)      
+library(janitor)
+library(knitr)
+library(ggplot2)
+
+theme_set(theme_minimal())
+```
+
+## Armed Forces Data Wrangling Redux
+
+In this section I return to the Armed Forces Active Duty data from earlier in the semester. The goal is to transform the original frequency table into two tidy data frames and then create a frequency table that lets me explore the relationship between sex and rank in a subset of the armed forces.
+
+First, I create:
+
+- a **grouped data frame**, where each row is a group of soldiers defined by branch, rank, sex, and year, and
+- an **individual-level data frame**, where each row represents one soldier.
+
+Using the  data, I then focus on enlisted soldiers in the Army and build a two-way frequency table of sex by rank.
+
+```{r}
+#| label: armed-forces-table
+#| ref.label: armed-forces-sex-rank
+#| echo: false
+```
+
+In this table, rows represent sex and columns represent enlisted ranks. If sex and rank were independent, we would expect the distribution of males and females to look similar across all rank levels. Instead, we see that male soldiers make up the majority at every rank, with female representation changing slightly by rank. This pattern suggests that sex and rank are not completely independent in this subset of the Army.
+
+## Popularity of Baby Names
+
+For the baby names visualization, I used the `BabyNames` data from the `dcData` package and focused on four names: Emma, Sophia, Liam, and Noah.
+
+- **Emma** and **Sophia** are popular names for girls.
+- **Liam** and **Noah** are popular names for boys.
+
+These names were chosen because they have all been very common in recent years but have slightly different trends over time. Plotting them together lets me compare how their popularity rises and falls across decades for both female and male names.
+
+```{r}
+#| label: baby-names-plot-fig
+#| ref.label: baby-names-analysis
+#| echo: false
+```
+
+Overall, all four names grow in popularity in the late twentieth and early twenty-first century, but they do so on slightly different timelines. Some names rise quickly and then level off, while others peak and begin to decline. This highlights how naming trends can change across generations even for names that currently feel very common.
+
+## Plotting a Mathematical Function: The Box Problem
+
+In the Box Problem, we start with a rectangular sheet of paper, cut out squares of side length \(x\) from each corner, and fold up the sides to make an open-top box. If the original sheet has length \(L\) and width \(W\), the resulting box has height \(x\), length \(L - 2x\), and width \(W - 2x\). The volume of the box as a function of \(x\) is
+
+\[
+V(x) = x(L - 2x)(W - 2x).
+\]
+
+For this assignment, I use a sheet that is 38 cm by 22 cm. Figure @ref(fig:box-volume-plot-fig) displays the volume of the box as a function of the cut-out size \(x\) using `ggplot2` and `stat_function()`.
+
+```{r}
+#| label: box-volume-plot-fig
+#| ref.label: box-problem-analysis
+#| echo: false
+```
+
+From the plot, we can see that the volume starts at zero when \(x = 0\), increases to a maximum at an interior value of \(x\), and then decreases back to zero as \(x\) approaches the point where one of the box dimensions would go to zero. This shape reflects the trade-off between making the base of the box smaller and increasing the height.
+
+## What I Feel I Have Learned So Far
+
+So far in this course I have learned how to move from raw or summarized data to tidy data frames that are easier to analyze. I am more comfortable using `dplyr` pipelines to wrangle data and `ggplot2` to build plots that answer specific questions. Working with Quarto has also shown me how to keep code, results, and writing together in a single reproducible document. Keeping all of my code organized in a Code Appendix lets the main text focus on interpretation while still allowing someone else to see exactly how each table and plot was created.
+
+# Code Appendix
+
+## Setup Code
+
+```{r}
+#| label: appendix-setup
+#| ref.label: setup
+#| echo: true
+#| eval: false
+```
+
+## Armed Forces: Data Wrangling and Frequency Table
+
+```{r}
+#| label: armed-forces-wrangle
+#| include: false
+
+data("ArmedForcesActiveDuty", package = "dcData")
+armed_forces_raw <- ArmedForcesActiveDuty
+
+armed_forces_clean <- armed_forces_raw |>
+  janitor::clean_names()
+
+armed_grouped <- armed_forces_clean |>
+  pivot_longer(
+    cols = -c(branch, rank, sex), 
+    names_to = "year",
+    values_to = "count"
+  ) |>
+  mutate(
+    year = as.integer(year),
+    count = as.integer(count)
+  ) |>
+  filter(count > 0)
+
+armed_individual <- armed_grouped |>
+  uncount(weights = count, name = "n_soldiers")
+
+```
+
+```{r}
+#| label: armed-forces-sex-rank
+#| include: false
+
+army_enlisted <- armed_ |>
+  filter(branch == "Army", rank_type == "Enlisted")
+
+army_sex_rank_table <- army_enlisted |>
+  count(sex, rank_name, name = "n") |>
+  pivot_wider(
+    names_from = rank_name,
+    values_from = n,
+    values_fill = 0
+  )
+
+kable(
+  army_sex_rank_table,
+  caption = "Table 1. Frequency of sex by rank for Army enlisted personnel.",
+  col.names = c("Sex", colnames(army_sex_rank_table)[-1])
+) |>
+  kableExtra::kable_styling(full_width = FALSE)
+```
+
+```{r}
+#| label: appendix-armed-forces-code
+#| ref.label: armed-forces-wrangle
+#| echo: true
+#| eval: false
+```
+
+```{r}
+#| label: appendix-armed-forces-table-code
+#| ref.label: armed-forces-sex-rank
+#| echo: true
+#| eval: false
+```
+
+## Baby Names: Data Wrangling and Visualization
+
+```{r}
+#| label: baby-names-analysis
+#| include: false
+
+data("BabyNames", package = "dcData")
+
+selected_names <- BabyNames %>%
+  filter(
+    (name %in% c("Emma", "Sophia") & sex == "F") |
+      (name %in% c("Liam", "Noah") & sex == "M")
+  )
+
+baby_names_plot <- ggplot(selected_names, aes(x = year, y = count, color = name)) +
+  geom_line(size = 1) +
+  labs(
+    title = "Popularity of Selected First Names in the U.S. (1880–2020)",
+    x = "Year",
+    y = "Number of Births",
+    color = "Name"
+  ) +
+  theme_minimal() +
+  scale_color_manual(values = c(
+    "Emma"   = "#E69F00",
+    "Sophia" = "#56B4E9",
+    "Liam"   = "#009E73",
+    "Noah"   = "#CC79A7"
+  ))
+
+baby_names_plot
+```
+
+```{r}
+#| label: appendix-baby-names-code
+#| ref.label: baby-names-analysis
+#| echo: true
+#| eval: false
+```
+
+## Box Problem: Volume Function and Plot
+
+```{r}
+#| label: box-problem-analysis
+#| include: false
+
+L <- 38  # length
+W <- 22  # width
+
+volume_function <- function(x) {
+  x * (L - 2 * x) * (W - 2 * x)
+}
+
+x_min <- 0
+x_max <- min(L, W) / 2
+
+box_volume_plot <- ggplot(
+  data.frame(x = c(x_min, x_max)),
+  aes(x = x)
+) +
+  stat_function(fun = volume_function, linewidth = 1) +
+  labs(
+    title = "Volume of the Box as a Function of Cut-Out Size x",
+    x = "Cut-out Size (x cm)",
+    y = "Volume (cubic cm)"
+  ) +
+  theme_minimal()
+
+box_volume_plot
+```
+
+```{r}
+#| label: appendix-box-problem-code
+#| ref.label: box-problem-analysis
+#| echo: true
+#| eval: false
+```
